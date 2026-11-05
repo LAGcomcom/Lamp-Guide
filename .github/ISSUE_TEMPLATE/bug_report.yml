@@ -1,0 +1,30 @@
+name: 问题反馈
+description: 报告 Lamp Guide 的可复现问题
+body:
+  - type: markdown
+    attributes:
+      value: 请先遮盖账号、Key、Cookie、订阅地址和对话内容。
+  - type: input
+    id: version
+    attributes:
+      label: Lamp Guide 和 Windows 版本
+      placeholder: Lamp Guide 1.2.0 / Windows 11 x64
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 涉及渠道或模型时，请提供渠道名与模型 ID。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望结果与实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 去敏截图或日志

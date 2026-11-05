@@ -1,0 +1,74 @@
+# ---- 产物与外部依赖 ----
+/zen-ui.exe
+/zen-ui.exe~
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.obj
+*.a
+*.pdb
+/dist/
+/packaging/node_modules/
+/rsrc_windows_*.syso
+
+# 参考物料：源码镜像 / 发行包 / 抓下来的安装包
+/_refs/
+/_icons_tmp/
+/_sessionsrc/
+*.tgz
+
+# 一次性探针与抓包残留（只在本地跑，不入库）
+/_probe*
+/_dump*
+/_fetch*
+/_hook*
+/_brand_*
+/_si_extract.json
+/_tok.txt
+/_zcode_*
+/_hw_part*
+/_headers_region.txt
+/_oauth_region.txt
+/_prov_marks.txt
+/_cli_oauth.js.txt
+/_httpc.js.txt
+/_signer*.js.txt
+/_dbgshot.js
+/_crop.py
+/_analyze*.py
+/_egprobe/
+/_loginprobe/
+/_qrmod/
+
+# _gwcheck 是正式的验收工具（文档里 go run ./_gwcheck -io），跟着源码走
+
+# 截图工程：保留最近一轮成品验收图，其余不入库
+/shots/_probe/
+/shots/_rev/
+/shots/_rev_mask/
+/shots/*
+!/shots/_F_*.png
+!/shots/_agg_*.png
+!/shots/_chan_final*.png
+!/shots/_chan_narrow_final.png
+!/shots/_chan_dark_final.png
+!/shots/_chan_dlg_*_final*.png
+!/shots/capture-window.ps1
+!/shots/nav-window.ps1
+!/shots/scroll-window.ps1
+
+# ---- WebView2 缓存写坏产生的乱码目录（本地遗留，不入库） ----
+/㩃啜*
+
+# ---- Go ----
+/zenui
+/zenui.exe
+*.test
+*.out
+
+# Local development records and presentation render caches
+/docs/sessions/
+/docs/codex/
+**/.film/

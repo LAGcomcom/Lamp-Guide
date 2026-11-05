@@ -1,0 +1,9 @@
+{
+  "name": "lamp-guide-build-assets",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Render the handwritten Lamp Guide SVG for Windows packaging",
+  "devDependencies": {
+    "@resvg/resvg-js": "2.6.2"
+  }
+}
