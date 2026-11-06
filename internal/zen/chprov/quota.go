@@ -42,6 +42,21 @@ func ReadQuota(ctx context.Context, id string, acct Account) Quota {
 	if acct.Empty() {
 		return Fail("未登录（没有可用凭据）")
 	}
+	if IsNativeChannel(id) {
+		for _, key := range QuotaExtraKeys(id) {
+			if acct.Field(key) == "" {
+				return Fail("凭据缺少 " + key)
+			}
+		}
+		p, status, failure := checkinRequest(ctx, "GET", spec.Quota.URL(acct), rewardHeaders(id, acct), "")
+		if failure != nil {
+			return Fail("额度请求失败，请检查网络、代理或登录会话")
+		}
+		if failure = rewardEnvelope(id, p, status); failure != nil {
+			return Fail(failure.Message)
+		}
+		return newRewardQuota(spec, acct, p)
+	}
 	if id == "qoder" || id == "qodercn" {
 		// Read THIS account, rather than the currently selected sidecar login.
 		spec.Quota = QuotaSpec{Method: "GET", BaseURL: qoderOpenAPIBase, Path: "/api/v2/quota/usage", Auth: AuthBearer}
@@ -276,8 +291,13 @@ func flatten(v any) any {
 // CycleCapacityRemain / DeductionEndTime）。深搜能找到 DeductionEndTime（键名在表里），
 // 但它会退化成「随便抓到第一个包」—— 所以要逐包解析、取**有效包**里最早的那个。
 var shapeHandlers = map[string]func(Spec, Account, any) Quota{
-	"qoder":   qoderQuota,
-	"qodercn": qoderQuota,
+	"astudio":      newRewardQuota,
+	"autoclaw":     newRewardQuota,
+	"autoclawintl": newRewardQuota,
+	"magicrew":     newRewardQuota,
+	"magicrewintl": newRewardQuota,
+	"qoder":        qoderQuota,
+	"qodercn":      qoderQuota,
 	// zcode：data.balances[] 各带 expires_at（秒）。企业版不下发额度数字，
 	// 此时按**永久**（不是 0 —— 0 是「已用光」的语义）。
 	"zcode": func(_ Spec, _ Account, payload any) Quota {

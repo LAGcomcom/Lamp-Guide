@@ -109,7 +109,7 @@ func TestAllThirtyChannelsAreRegistered(t *testing.T) {
 		"cline", "loomy", "raccoon", "minimax", "minimaxintl", "zcode", "opencode",
 		"officeace", "accio", "qiniu", "gemini", "modelscope", "nvidia-nim", "zhipu",
 		"siliconflow", "longcat", "groq", "openrouter", "github-models",
-		"huggingface", "cerebras", "mistral", "anthropic",
+		"huggingface", "cerebras", "mistral", "anthropic", "astudio", "autoclaw", "autoclawintl", "magicrew", "magicrewintl",
 	}
 	if len(All()) != len(want) {
 		t.Fatalf("描述表有 %d 家，期望 %d 家", len(All()), len(want))

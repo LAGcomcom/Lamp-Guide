@@ -43,7 +43,7 @@ func assetName() string {
 var FeedURL = "https://api.github.com/repos/LAGcomcom/Lamp-Guide/releases/latest"
 
 // Current is the running version, overridable via -ldflags.
-var Current = "1.2.0"
+var Current = "1.2.1"
 
 // ResolveFeed uses the Lamp Guide release stream for the inherited zen-gate
 // default without rewriting the shared user config. Explicit custom feeds stay

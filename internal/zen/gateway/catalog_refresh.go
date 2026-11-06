@@ -112,8 +112,11 @@ func (s *Server) adminAggregateRefreshModels(w http.ResponseWriter, r *http.Requ
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() { defer wg.Done(); report, providerErr = s.RefreshProviderCatalogs(ctx) }()
+	nativeReport := s.refreshNativeCatalogs(ctx)
 	s.Lane.RefreshCatalogNow(ctx)
 	wg.Wait()
+	report.Updated = append(report.Updated, nativeReport.Updated...)
+	report.Failed = append(report.Failed, nativeReport.Failed...)
 	if providerErr != nil {
 		writeJSON(w, 500, map[string]any{"ok": false, "error": "模型目录保存失败"})
 		return

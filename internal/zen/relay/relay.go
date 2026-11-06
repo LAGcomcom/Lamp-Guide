@@ -114,6 +114,16 @@ type Turn struct {
 	Tools     []lane.ToolDef
 	MaxTokens int    // ≤ 0 → provider default
 	Agent     string // caller label for stats
+	// Upstream is used only by built-in channel adapters. User provider turns
+	// keep the existing headers, transport and message serialization.
+	Upstream *UpstreamOptions
+}
+
+type UpstreamOptions struct {
+	Headers      map[string]string
+	Client       *http.Client
+	BuildBody    func(map[string]any)
+	RewriteFrame func([]byte) []byte
 }
 
 // Complete streams one turn from the provider into lane chunks. Returns the
@@ -159,8 +169,14 @@ func Complete(ctx context.Context, t Turn, emit func(lane.Chunk)) (lane.Usage, s
 		body["stream_options"] = map[string]any{"include_usage": true}
 	}
 
+	if t.Upstream != nil && t.Upstream.BuildBody != nil {
+		t.Upstream.BuildBody(body)
+	}
 	decoder := lane.NewDecoder(wire, nil, emit)
-	usage, err := postStreamed(ctx, p, body, func(payload []byte) error {
+	usage, err := postStreamedWithOptions(ctx, p, body, t.Upstream, func(payload []byte) error {
+		if t.Upstream != nil && t.Upstream.RewriteFrame != nil {
+			payload = t.Upstream.RewriteFrame(payload)
+		}
 		decoder.Decode(payload)
 		return nil
 	})
@@ -190,6 +206,10 @@ func ProbeTiming(ctx context.Context, p *store.Provider) (int64, error) {
 // merging usage frames along the way. Mirrors lane.PostStreamed's contract
 // (idle-tolerant read owned by the request context) against an arbitrary URL.
 func postStreamed(ctx context.Context, p *store.Provider, body map[string]any, onData func([]byte) error) (*lane.Usage, *lane.UpstreamError) {
+	return postStreamedWithOptions(ctx, p, body, nil, onData)
+}
+
+func postStreamedWithOptions(ctx context.Context, p *store.Provider, body map[string]any, options *UpstreamOptions, onData func([]byte) error) (*lane.Usage, *lane.UpstreamError) {
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return nil, &lane.UpstreamError{Code: lane.CodeTransport, Message: err.Error()}
@@ -201,8 +221,17 @@ func postStreamed(ctx context.Context, p *store.Provider, body map[string]any, o
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("accept", "text/event-stream")
 	authHeaders(req.Header, p.APIKey, p.Protocol)
+	client := lane.Client()
+	if options != nil {
+		for key, value := range options.Headers {
+			req.Header.Set(key, value)
+		}
+		if options.Client != nil {
+			client = options.Client
+		}
+	}
 
-	resp, err := lane.Client().Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, &lane.UpstreamError{Code: lane.CodeAborted, Message: "cancelled"}

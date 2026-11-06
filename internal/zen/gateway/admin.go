@@ -169,6 +169,12 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request, rest string
 		s.adminAggregateRefreshModels(w, r)
 	case rest == "channel/state" && r.Method == http.MethodGet:
 		s.adminChannelState(w, r)
+	case rest == "checkin/state" && r.Method == http.MethodGet:
+		s.adminCheckinState(w, r)
+	case rest == "checkin/settings" && r.Method == http.MethodPost:
+		s.adminCheckinSettings(w, r)
+	case rest == "checkin/run" && r.Method == http.MethodPost:
+		s.adminCheckinRun(w, r)
 	case rest == "channel/import" && r.Method == http.MethodPost:
 		s.adminChannelImport(w, r)
 	case rest == "channel/login" && r.Method == http.MethodPost:

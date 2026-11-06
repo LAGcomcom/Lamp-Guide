@@ -17,6 +17,7 @@ import {
 } from '../components/index.js';
 import { providerBrand, BrandMark, brandOf, BRANDS } from '../brands.js';
 import createOpenCode from './opencode.js';
+import checkinPanel from './checkin.js';
 
 /* mark 只喂给页面自己的时间线：冷启动慢在哪一段，得由页面量出来。 */
 function mark(name) {
@@ -313,7 +314,9 @@ export default function createPage(ctx, options) {
     aggRefreshing: false,
     /* 渠道面同样有自己的一份表：它含登录态与逐家额度，节奏比主状态快。 */
     channels: null,
-    channelsError: ''
+    channelsError: '',
+    checkins: null,
+    checkinError: ''
   };
 
   function hideBar() {
@@ -495,11 +498,31 @@ export default function createPage(ctx, options) {
      因为它们的节奏不同：额度一分钟内可复用，登录态要实时。 */
 
   async function loadChannels() {
+    await loadCheckins();
     const res = await gw('channel/state');
     if (!res.ok) { draft.channelsError = res.error; draft.channels = null; return false; }
     draft.channelsError = '';
     draft.channels = res.data || {};
     return true;
+  }
+
+  async function loadCheckins() {
+    const res = await gw('checkin/state');
+    draft.checkinError = res.ok ? '' : res.error;
+    if (res.ok) draft.checkins = res.data;
+  }
+
+  async function saveCheckins(patch) {
+    if (!draft.checkins) return;
+    const res = await gw('checkin/settings', { ...draft.checkins.settings, ...patch });
+    if (!res.ok) bad('签到设置未保存', res.error);
+    await loadCheckins(); render();
+  }
+
+  async function runCheckins() {
+    const res = await gw('checkin/run', {});
+    if (!res.ok) bad('签到未启动', res.error);
+    await loadCheckins(); render();
   }
 
   /* 登录形态的一句话说明。四种形态要用户做的事完全不同，
@@ -561,6 +584,10 @@ export default function createPage(ctx, options) {
      用户得先去猜「这个要去哪抄」；而这一列的每一格都是必须去某个控制台找的东西，
      猜错一次就是一次 401，而 401 在面板上长得像「没额度」。 */
   const FIELD_LABEL = {
+	 refresh_token: 'Refresh Token（可选）',
+	 sso_session_id: '登录会话 ssoSessionId',
+	 token: '账号会话 Token（可选）',
+	 organization_code: '组织码（国际站必填）',
     access_key_id: 'Access Key ID（AK）',
     secret_access_key: 'Secret Access Key（SK）',
     security_token: 'STS 临时令牌（可选）',
@@ -579,6 +606,10 @@ export default function createPage(ctx, options) {
     product: '产品线'
   };
   const FIELD_HINT = {
+	 refresh_token: '填写后可在 Access Token 到期时自动续期；只保存在本机。',
+	 sso_session_id: 'AStudio 的登录会话，和模型 Bearer Token 分别填写；也可直接从本机插件导入。',
+	 token: 'AStudio 的账号会话 Token；未提供时使用 ssoSessionId。',
+	 organization_code: '从当前网页登录的组织读取；国际站先选中组织后再导入。',
     access_key_id: '华为云「我的凭证 → 访问密钥」里那串 AK。',
     secret_access_key: '与 AK 成对的 SK，只在这里贴一次。',
     security_token: '只有临时凭证才要；长期 AK/SK 留空即可。',
@@ -612,6 +643,10 @@ export default function createPage(ctx, options) {
   /* 这一家的结论：它现在发不发得出请求，以及为什么。
      五种原因要用户做的事完全不同（接入 / 再探测一次 / 换一条 Key / 重新登录 /
      什么都别做），压成一句「未登录」会让人跑去查登录状态，而问题在额度。 */
+  function isNativeChannel(id) {
+    return ['astudio', 'autoclaw', 'autoclawintl', 'magicrew', 'magicrewintl'].includes(id);
+  }
+
   function chanStatus(c) {
     const q = pick(c, 'quota', {}) || {};
     /* 账号数取两者之中大的那个：workbuddy 的登录态不在凭据表里（在 lane），
@@ -630,19 +665,21 @@ export default function createPage(ctx, options) {
       if (left <= 0) return { text: '额度已到期', tone: 'tone-bad' };
       return { text: remainText(ms, false), tone: remainTone(ms, false) };
     }
-    if (pick(q, 'never', false)) return { text: '无到期（永久额度）', tone: 'tone-mute' };
+    if (pick(q, 'never', false)) {
+      return { text: remainText(0, true, pick(c, 'id', '')), tone: 'tone-mute' };
+    }
     return { text: '上游说这份额度不可用', tone: 'tone-warn' };
   }
 
   /* 一条账号的额度胶囊：口径与上面完全一致，只是喂进去的是一个只有一条账号的
      对象。两处各写一套判据，面板会在「这一家还剩 3 天」与「这个号还剩 20 天」
      之间自相矛盾，而两者都没有说谎。 */
-  function chanQuotaTag(q) {
+  function chanQuotaTag(q, id) {
     /* 空对象 = 这一条**没读**（后端只在读到读数时才挂 quota）。它不能落到
        「上游说不可用」那一档：那是「上游明确拒绝」，与「还没探测」是两件事。 */
     const o = q || {};
     if (!Object.keys(o).length) return toneTag('未读额度', 'tone-mute');
-    const st = chanStatus({ accountCount: 1, quota: o });
+    const st = chanStatus({ id, accountCount: 1, quota: o });
     return toneTag(st.text, st.tone);
   }
 
@@ -671,11 +708,13 @@ export default function createPage(ctx, options) {
        每一行都挂着一条无法消除的警告 —— 那种警告会训练人忽略整栏。
        qoder 的四格同理：cosy_key / encrypt_user_info 是登录成功后由网关现场铸的，
        machine_id / uid 是读回来的这台设备与账号标识。它们一个都不该由用户填。 */
-    const INTERNAL = ['product', 'account_id', 'cosy_key', 'encrypt_user_info', 'machine_id', 'uid'];
+    const INTERNAL = ['product', 'account_id', 'cosy_key', 'encrypt_user_info', 'machine_id', 'uid']
+      .filter((k) => !(id === 'astudio' && k === 'account_id'));
     const extra = (Array.isArray(pick(spec, 'extraKeys', [])) ? pick(spec, 'extraKeys', [])
       : []).map(String).filter((k) => INTERNAL.indexOf(k) < 0);
     const got = Array.isArray(pick(hint, 'extraKeys', [])) ? pick(hint, 'extraKeys', []).map(String) : [];
-    const missing = extra.filter((k) => !got.some((g) => g === k));
+    const required = new Set(pick(spec, 'requiredExtraKeys', extra));
+    const missing = extra.filter((k) => required.has(k) && !got.some((g) => g === k));
 
     /* 「登没登录」读**同一个来源**：分组与这里都用 loggedIn（含 lane 账号与
        sidecar）。若这里改用「有没有手填凭据」，sidecar 已登录、凭据没导入的那家
@@ -728,7 +767,9 @@ export default function createPage(ctx, options) {
       LOGIN_KIND_LABEL[kind] || kind,
       single ? '单账号' : '',
       remainRaw ? '剩 ' + remainRaw : '',
-      missing.length ? '缺 ' + missing.map(fieldLabel).join(' / ') : ''
+      missing.length ? '缺 ' + missing.map(fieldLabel).join(' / ') : '',
+      typeof c.catalogCount === 'number' && loggedIn ? c.catalogCount + ' 个已获取模型' : '',
+      c.catalogError ? '模型目录：' + c.catalogError : ''
     ].filter(Boolean);
 
     const endpoint = [String(pick(spec, 'method', '')), String(pick(spec, 'baseUrl', '')),
@@ -741,7 +782,7 @@ export default function createPage(ctx, options) {
       h('div', { class: 'chan-head-main' },
         h('div', { class: 'agg-turn-name' },
           h('span', { text: String(pick(c, 'name', id)) }),
-          toneTag(TIER_LABEL[tier] || tier, tier === 'expiry' ? 'tone-ok' : 'tone-mute'),
+          toneTag(isNativeChannel(id) && tier === 'never' ? '按余额参与 · 未提供精确到期' : (TIER_LABEL[tier] || tier), tier === 'expiry' ? 'tone-ok' : 'tone-mute'),
           unit && unit !== '无' ? toneTag(unit, 'tone-mute') : null,
           accts.length ? toneTag(accts.length + ' 个账号', 'tone-mute') : null),
         h('div', { class: 'agg-turn-sub', text: subParts.join('  ·  ') }),
@@ -791,7 +832,7 @@ export default function createPage(ctx, options) {
       const extraKeys = Array.isArray(pick(a, 'extraKeys', [])) ? pick(a, 'extraKeys', []).map(String) : [];
       /* 附加字段在凭据里只报了「哪些在」，没报值 —— 面板上回显 cookie / AK
          等于一次截图带走全部凭据。这里只说缺了哪几个。 */
-      const amiss = extra.filter((k) => !extraKeys.some((g) => g === k));
+      const amiss = extra.filter((k) => required.has(k) && !extraKeys.some((g) => g === k));
       const created = asNumber(pick(a, 'createdAtMs', 0), 0);
       /* 「缺」只在**这一条和别人不一样**时写在这里：整家都缺同一个字段时，
          卡底那句警告已经说过一次，逐行重复会把清单读成一排同样的错。 */
@@ -807,7 +848,7 @@ export default function createPage(ctx, options) {
 
       /* 圆点跟着这一份的额度走，不是一个恒绿的点：一个号已到期、另一个号还能
          撑二十天，正是这一列要一眼分开的事；全涂成绿色就把它们又合回去了。 */
-      const ast = chanStatus({ accountCount: 1, quota: aq });
+      const ast = chanStatus({ id, accountCount: 1, quota: aq });
       const dotTone = ast.tone === 'tone-ok' ? 'is-ok'
         : ast.tone === 'tone-bad' ? 'is-bad'
           : ast.tone === 'tone-warn' ? 'is-warn' : 'is-mute';
@@ -828,7 +869,7 @@ export default function createPage(ctx, options) {
             title: identity }) : null,
           h('div', { class: 'chan-acc-meta', text: meta })),
         h('div', { class: 'chan-acc-side' },
-          chanQuotaTag(aq),
+          chanQuotaTag(aq, id),
           logout));
       list.append(row);
     }
@@ -886,7 +927,7 @@ export default function createPage(ctx, options) {
          输入框下面（它是必须读懂的指令），再原样放进 placeholder 会让同一句话
          在框内外各出现一次，看起来像两件事。占位只放字段名本身。 */
       const inp = h('input', {
-        class: 'text-box', type: 'text', autocomplete: 'off', spellcheck: 'false',
+        class: 'text-box', type: ['sso_session_id', 'token', 'refresh_token'].includes(k) ? 'password' : 'text', autocomplete: 'off', spellcheck: 'false',
         placeholder: fieldLabel(k) || k
       });
       extras[k] = inp;
@@ -952,7 +993,7 @@ export default function createPage(ctx, options) {
             (n ? '这一家现在有 ' + n + ' 个账号  ·  ' : '')
             + (pick(q, 'known', false)
               ? '这一份 ' + remainText(asNumber(pick(q, 'expiryMs', 0), 0), false)
-              : (pick(q, 'never', false) ? '这一份按永久额度参与轮换。' : '额度读数未提供。')));
+              : (pick(q, 'never', false) ? (isNativeChannel(id) ? '余额可用，上游未提供精确到期时间。' : '这一份按永久额度参与轮换。') : '额度读数未提供。')));
         }
         alive = false;
         return true;
@@ -1247,6 +1288,9 @@ export default function createPage(ctx, options) {
       top.body.append(card);
     }
     pages.push(top.node);
+
+    pages.push(checkinPanel(draft.checkins, draft.checkinError, saveCheckins, runCheckins,
+      async () => { await loadCheckins(); render(); }));
 
     /* 只分两组：**按「这一家现在发不发得出请求」切**，不按档位再切一组。
        档位是排序解释（每行右侧的胶囊已经写了），照它切组会让同一家在两组里
@@ -2271,8 +2315,8 @@ export default function createPage(ctx, options) {
 
   /* 「还有多久作废」是这一页的全部价值，所以它写成人话而不是百分比：
      剩余比例要除以一个"总额度寿命"，那个分母上游不给，编一个就是在画假数据。 */
-  function remainText(ms, never) {
-    if (never) return '无到期（永久额度）';
+  function remainText(ms, never, channel) {
+    if (never) return isNativeChannel(channel) ? '余额可用 · 未提供精确到期' : '无到期（永久额度）';
     const left = asNumber(ms, 0) - Date.now();
     if (!ms) return '到期时刻未知';
     if (left <= 0) return '已到期';
@@ -2441,7 +2485,7 @@ export default function createPage(ctx, options) {
         !participates ? toneTag('未接入聚合', 'tone-mute') : exp.failed
           ? toneTag('这次读不到额度', 'tone-warn')
           : exp.any
-            ? toneTag(remainText(exp.ms, exp.never), remainTone(exp.ms, exp.never))
+            ? toneTag(remainText(exp.ms, exp.never, cid), remainTone(exp.ms, exp.never))
             : toneTag('无在轮换的额度', 'tone-mute'),
         h('div', { class: 'agg-turn-move' },
           Button({ icon: 'up', variant: 'subtle', square: true, disabled: idx === 0, onClick: () => move(-1) }),
@@ -2512,7 +2556,7 @@ export default function createPage(ctx, options) {
           h('span', { class: 'agg-step-price mono', text: priceText, title: knownPrice ? '渠道公布的当前倍率；促销按生效时段计算。不同渠道的积分单位由各渠道定义。' : '渠道未公布积分倍率；按 token 计费的价格不会换算为积分倍率。' }),
           readFailed
             ? toneTag('这次读不到额度', 'tone-warn')
-            : toneTag(remainText(expiryMs, never), remainTone(expiryMs, never)),
+            : toneTag(remainText(expiryMs, never, chID), remainTone(expiryMs, never)),
           Toggle({ checked: !excluded, onChange: (v) => setOn(v), labelOn: '用', labelOff: '停', showLabel: false }))));
 
     const box = h('div', { class: 'agg-step' + (excluded || !eligible ? ' is-off' : '') + (last ? ' is-last' : '') }, row);
@@ -3870,13 +3914,14 @@ export default function createPage(ctx, options) {
          是活的数字，所以这几面一起按 30 秒一轮跟状态走。 */
       if (autoRefresh) clearInterval(autoRefresh);
       autoRefresh = setInterval(() => {
+        if (face === 'channels' && !typing()) { loadCheckins().then(render); return; }
         const busy = String(pick(state, 'probingModel', '')) !== '';
         const live = face === 'models' || face === 'logs'
           || face === 'network' || face === 'service';
         /* 有输入框正被操作时不重画：replaceChildren 会把焦点和还没提交的
            字符一起丢掉，用户会觉得自己打的字被吞了。 */
         if ((busy || live) && !typing()) load().then(render);
-      }, 30000);
+      }, face === 'channels' ? 5000 : 30000);
     },
     onUnmount() {
       hideBar();

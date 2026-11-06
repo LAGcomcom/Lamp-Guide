@@ -71,4 +71,7 @@
 # Local development records and presentation render caches
 /docs/sessions/
 /docs/codex/
+# Local daily-reward state and atomic-write temporary files
+checkin.json
+.checkin-*
 **/.film/

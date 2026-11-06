@@ -29,6 +29,8 @@ Lamp Guide 基于 [zen-gate](https://github.com/LAGcomcom/zen-gate) 继续开发
 | 禁用状态同步 | 模型所有候选被停用后，从聚合 API 与相关客户端同步名单中移除 |
 | OpenCode 专页 | 单独管理相关设置、代理与额度刷新 |
 | 账号与代理 | 管理渠道登录状态、额度、出口、代理模式与订阅轮换 |
+| 自动与手动签到 | 渠道页「一键签到」、按账号定时领取、渠道开关、失败补签；能力与限制见[签到及渠道状态](docs/CHECKIN_AND_CHANNELS.md) |
+| 新渠道 | AStudio、AutoClaw 国内/国际版、超级麦吉/MagiCrew 国际版；支持插件导入或手工凭据，新渠道为试验接入，原生登录向导及真实账号验证尚待完成 |
 | 日间 / 夜间 | 标题栏一键切换、平滑过渡、记忆主题，兼容系统减少动画偏好 |
 | 安装与卸载 | 中文安装向导、目录与快捷方式选择，附 WebView2 离线运行环境 |
 
@@ -36,7 +38,7 @@ Lamp Guide 基于 [zen-gate](https://github.com/LAGcomcom/zen-gate) 继续开发
 
 ## 开始使用
 
-1. 打开 [Releases](https://github.com/LAGcomcom/Lamp-Guide/releases/latest)，下载 `LampGuide-Setup-1.2.0-win-x64.exe`。后续版本使用对应版本号。
+1. 打开 [Releases](https://github.com/LAGcomcom/Lamp-Guide/releases/latest)，下载 `LampGuide-Setup-1.2.1-win-x64.exe`。后续版本使用对应版本号。
 2. 正常退出正在运行的 zen-gate / Lamp Guide，再按安装向导完成安装。首次安装缺少 WebView2 时会补齐运行环境。
 3. 在“服务”页查看实际 Base URL、端口与访问 Key；在“渠道”登录账号，或在“供应商”添加自己的 API。
 4. 在“聚合”搜索和展开模型，选择渠道是否参与轮换，并查看各渠道的积分倍率。
@@ -45,7 +47,7 @@ Lamp Guide 基于 [zen-gate](https://github.com/LAGcomcom/zen-gate) 继续开发
 安装包附带 SHA-256 校验文件。在 PowerShell 中运行以下命令，并与 `.sha256` 文件比较：
 
 ```powershell
-Get-FileHash .\LampGuide-Setup-1.2.0-win-x64.exe -Algorithm SHA256
+Get-FileHash .\LampGuide-Setup-1.2.1-win-x64.exe -Algorithm SHA256
 ```
 
 当前安装包未做代码签名。WebView2 使用微软签名的官方运行环境。更新 Lamp Guide 时，请下载新安装包并安装到原目录；目前不提供原地替换 EXE 的自动升级。

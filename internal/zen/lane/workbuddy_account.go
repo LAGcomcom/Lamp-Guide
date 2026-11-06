@@ -511,11 +511,10 @@ func wbGet(path string, acct WBAccount) (int, []byte, error) {
 	return resp.StatusCode, data, nil
 }
 
-// WorkBuddyDailyActivity claims the day's activity reward with one tiny
-// conversation on the free deepseek model — the intl pool's daily task, the
-// same move the desktop client's 每日活跃 makes. Runs at most once per local
-// calendar day; a spent free window (6004) also closes the day, since retrying
-// inside a spent window buys nothing.
+// WorkBuddyDailyActivity is a legacy minimal free conversation helper. A
+// successful call or spent window is not proof that a daily reward was granted.
+// Core no longer schedules this helper as automatic check-in. The free-only
+// guard and legacy callers remain compatible.
 func (l *Lane) WorkBuddyDailyActivity(ctx context.Context) (bool, error) {
 	acct, ok := l.workBuddyReady()
 	if !ok {

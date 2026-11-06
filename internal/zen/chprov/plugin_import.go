@@ -57,6 +57,11 @@ var importPrefixes = []struct {
 	prefix string
 	id     string
 }{
+	{"ASTUDIO_ACCOUNT_", "astudio"},
+	{"AUTOCLAWINTL_ACCOUNT_", "autoclawintl"},
+	{"AUTOCLAW_ACCOUNT_", "autoclaw"},
+	{"MAGICREWINTL_ACCOUNT_", "magicrewintl"},
+	{"MAGICREW_ACCOUNT_", "magicrew"},
 	{"WORKBUDDY_ACCOUNT_", "workbuddy"},
 	{"BUDDY_ACCOUNT_", "buddy"},
 	{"QODERCN_ACCOUNT_", "qodercn"},
@@ -219,6 +224,34 @@ func accountFromPluginJSON(id, raw string) (Account, string) {
 	}
 	// 逐家的附加字段（额度端点与推理头都要用）。
 	switch id {
+	case "astudio":
+		acct.AccessToken = firstNonEmpty(acct.AccessToken, field(m, "modelBearerToken"))
+		acct.ID = firstNonEmpty(acct.ID, field(m, "account_id"), field(m, "accountId"))
+		acct.Extra["account_id"] = firstNonEmpty(field(m, "account_id"), field(m, "accountId"))
+		acct.Extra["sso_session_id"] = firstNonEmpty(field(m, "sso_session_id"), field(m, "ssoSessionId"))
+		acct.Extra["token"] = field(m, "token")
+	case "autoclaw", "autoclawintl":
+		acct.AccessToken = cleanRewardToken(acct.AccessToken)
+		if acct.ExpiresAtMS > 0 && acct.ExpiresAtMS < 1e11 {
+			acct.ExpiresAtMS *= 1000
+		}
+		if sub, _, exp, ok := JWTClaims(acct.AccessToken); ok {
+			if acct.ID == "" {
+				acct.ID = sub
+			}
+			if exp > 0 {
+				acct.ExpiresAtMS = exp
+			}
+		}
+		acct.Extra["device_id"] = field(m, "device_id")
+	case "magicrew", "magicrewintl":
+		acct.AccessToken = field(m, "jwt") // management JWT; never substitute the inference API key
+		acct.Extra["organization_code"] = field(m, "organizationCode")
+		acct.Extra["api_key"] = field(m, "apiKey")
+		acct.Extra["api_key_expires_at"] = field(m, "apiKeyExpiresAt")
+		if sub, _, exp, ok := JWTClaims(acct.AccessToken); ok {
+			acct.ID, acct.ExpiresAtMS = sub, exp
+		}
 	case "zcode":
 		acct.Extra["device_mid"] = field(m, "device_mid")
 		acct.Extra["zai_access_token"] = field(m, "zai_access_token")

@@ -73,6 +73,11 @@ type Channel struct {
 // 签到能力、读图实测结论、面板上那句解释。行为字段（Tier / 额度端点 / 登录形态）
 // 一律来自 chprov 描述表，本表不重复登记 —— 否则两处会漂移。
 var channelMeta = map[string]Channel{
+	"astudio":      {ID: "astudio", Name: "AStudio（讯飞）", Vendor: "讯飞", Protocol: ProtocolOpenAI, AuthForm: AuthPasteKey, CreditUnit: CreditPoints, VisionNote: "以远端目录声明为准", Note: "从本机插件导入或填写自己的会话；每日奖励使用 Cookie，模型推理使用独立 Bearer Token。星火独立池不并入主余额。"},
+	"autoclaw":     {ID: "autoclaw", Name: "AutoClaw（国内版）", Vendor: "智谱", Protocol: ProtocolOpenAI, AuthForm: AuthPasteKey, CreditUnit: CreditPoints, VisionNote: "以远端目录声明为准", Note: "支持钱包查询与每日签到；钱包账本未对齐可用余额前，不推算积分到期。国内、国际账号分开保存。"},
+	"autoclawintl": {ID: "autoclawintl", Name: "AutoClaw（国际版）", Vendor: "智谱", Protocol: ProtocolOpenAI, AuthForm: AuthPasteKey, CreditUnit: CreditPoints, VisionNote: "以远端目录声明为准", Note: "国际站独立域名与凭据；支持钱包和每日签到。上游不返回领取数量时只显示领取状态。"},
+	"magicrew":     {ID: "magicrew", Name: "超级麦吉（国内版）", Vendor: "MagiCrew", Protocol: ProtocolOpenAI, AuthForm: AuthPasteKey, CreditUnit: CreditPoints, VisionNote: "以远端目录声明为准", Note: "网页登录 JWT 用于签到、余额和目录；模型网关独立签发 API Key。限时批次按北京时间到期。"},
+	"magicrewintl": {ID: "magicrewintl", Name: "MagiCrew（国际版）", Vendor: "MagiCrew", Protocol: ProtocolOpenAI, AuthForm: AuthPasteKey, CreditUnit: CreditPoints, VisionNote: "以远端目录声明为准", Note: "先在网页选中组织，再导入本机插件账号或填写 JWT 与组织码；国际站不得混用国内凭据。"},
 	"workbuddy": {
 		ID: "workbuddy", Name: "WorkBuddy（国际版）", Vendor: "腾讯",
 		Protocol: ProtocolOpenAI, AuthForm: AuthBrowserCallback,
@@ -289,6 +294,11 @@ var channelMeta = map[string]Channel{
 // 用户据此判断要不要挂代理。额度端点在 chprov 描述表里（两者常常不是同一个 host，
 // 例如 gemini 的推理在 generativelanguage、配额在 cloudcode-pa）。
 var baseURLOf = map[string]string{
+	"astudio":       "https://astronstudio-api-volces-prod.xf-yun.com/model-gateway/v1",
+	"autoclaw":      "https://autoglm-acceleration-api.zhipuai.cn/autoclaw-proxy/proxy/autoclaw",
+	"autoclawintl":  "https://autoglm-api.autoglm.ai/autoclaw-proxy/proxy/autoclaw",
+	"magicrew":      "https://i-magic-service.letsmagic.cn/v1",
+	"magicrewintl":  "https://magic-service.magicrew.ai/v1",
 	"workbuddy":     "https://www.workbuddy.ai/v2",
 	"qoder":         "http://127.0.0.1:8095/v1",
 	"qodercn":       "http://127.0.0.1:8095/v1",
@@ -343,6 +353,8 @@ func Channels() []Channel {
 		}
 		meta.BaseURL = baseURLOf[s.ID]
 		meta.Tier = s.Tier
+		mode, _ := chprov.CheckinCapability(s.ID)
+		meta.DailyClaim = mode == "automatic" || mode == "manual"
 		// 29 家全部参与轮换：这是本项目与参考实现的一处**有意分歧**。
 		// 参考实现只让「有临期折算」的 12 家参与；用户明确要求「那 27 个渠道也全部
 		// 加进去」，因为「面板上有、候选表里永远轮不到」才是最难解释的状态。

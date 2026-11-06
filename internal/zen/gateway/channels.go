@@ -126,6 +126,9 @@ func (s *Server) chanQuotas(id string) map[string]chprov.Quota {
 		out[acct.Key()] = s.cachedQuota(cacheKey, func() chprov.Quota {
 			ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 			defer cancel()
+			if chprov.IsNativeChannel(id) {
+				ctx = s.nativeContext(ctx)
+			}
 			return chprov.ReadQuota(ctx, id, acct)
 		})
 	}
@@ -363,6 +366,7 @@ func (s *Server) adminChannelImport(w http.ResponseWriter, r *http.Request) {
 	// 导进来的都是新凭据：整表读数作废，否则面板会拿旧的「还剩多久」冒充它们。
 	s.forgetQuota("", "")
 	s.syncOpenCode()
+	s.queueNativeCatalogRefresh()
 	/* 导入同样要接线：这条路径只往 ChannelAccounts 里写，而 WorkBuddy 的目录由
 	   lane 的快照决定、Qoder 的请求由转发层那个文件决定。不接着做，用户「导入
 	   成功、面板显示 7 家已登录」，而目录里一条 WorkBuddy 模型都没有、Qoder 的
@@ -478,6 +482,23 @@ func (s *Server) adminChannelState(w http.ResponseWriter, r *http.Request) {
 				}
 				return tokenHint(accts[0])
 			}(),
+		}
+		if chprov.IsNativeChannel(c.ID) {
+			required := chprov.QuotaExtraKeys(c.ID)
+			if required == nil {
+				required = []string{}
+			}
+			row["spec"].(map[string]any)["requiredExtraKeys"] = required
+			row["catalogCount"] = len(s.nativeModels()[c.ID])
+			for _, a := range accts {
+				s.nativeCatalogMu.RLock()
+				entry, exists := s.nativeCatalog[nativeCatalogKey(c.ID, a)]
+				s.nativeCatalogMu.RUnlock()
+				if exists && entry.Error != "" {
+					row["catalogError"] = entry.Error
+					break
+				}
+			}
 		}
 		rows = append(rows, row)
 	}
@@ -702,6 +723,9 @@ func (s *Server) saveChannelAccount(id string, acct chprov.Account, replaceAll b
 	// 作废整家而不是只作废这一条：Upsert 覆盖的是同 Key 的那一条，而
 	// 「新增」会改动折叠结果（这一家的结论取决于全部账号）。
 	s.forgetQuota(id, "")
+	if chprov.IsNativeChannel(id) {
+		s.queueNativeCatalogRefresh()
+	}
 	if id == "opencode" {
 		s.syncOpenCode()
 	}
@@ -803,8 +827,15 @@ func (s *Server) adminChannelToken(w http.ResponseWriter, r *http.Request) {
 		Nickname: strings.TrimSpace(in.Nickname), Extra: in.Extra,
 		Source: "paste", CreatedAtMS: time.Now().UnixMilli(),
 	}
+	if id == "autoclaw" || id == "autoclawintl" {
+		acct.AccessToken = strings.TrimSpace(strings.TrimPrefix(acct.AccessToken, "Bearer "))
+		if acct.RefreshTok == "" {
+			acct.RefreshTok = acct.Extra["refresh_token"]
+		}
+		delete(acct.Extra, "refresh_token")
+	}
 	// uid / 到期时刻能从 JWT 读就读（面板据此显示「还剩多久」）。
-	if sub, _, exp, ok := chprov.JWTClaims(token); ok {
+	if sub, _, exp, ok := chprov.JWTClaims(acct.AccessToken); ok {
 		if acct.ID == "" {
 			acct.ID = sub
 		}
@@ -818,6 +849,9 @@ func (s *Server) adminChannelToken(w http.ResponseWriter, r *http.Request) {
 	// 只有这一条的读数能回答；折叠结果可能被另一个好账号盖住。
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	defer cancel()
+	if chprov.IsNativeChannel(id) {
+		ctx = s.nativeContext(ctx)
+	}
 	q := chprov.ReadQuota(ctx, id, acct)
 	if s.logger != nil {
 		s.logger.Infof("渠道 %s 凭据已保存（%s），额度读数: %s", id, acct.Label(), chprov.ChannelQuotaDetail(chprov.MustSpec(id), q))

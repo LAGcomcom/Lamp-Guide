@@ -25,13 +25,14 @@ import (
 	"zenui/internal/zen/aggregate"
 	"zenui/internal/zen/announce"
 	"zenui/internal/zen/autotag"
+	"zenui/internal/zen/checkin"
 	"zenui/internal/zen/lane"
 	"zenui/internal/zen/logx"
 	"zenui/internal/zen/store"
 )
 
 // Version is the running build; overridable via -ldflags.
-var Version = "1.2.0"
+var Version = "1.2.1"
 
 // maxRequestBody bounds one chat/responses/messages request body. The old
 // 8MB cap rejected normal vision traffic — a handful of base64 screenshots
@@ -103,6 +104,14 @@ type Server struct {
 	quotaPending    map[string]*quotaFlight
 	quotaGeneration uint64
 	ocAdminMu       sync.Mutex
+	checkins        *checkin.Manager
+	checkinStart    sync.Once
+	checkinCtx      context.Context
+	checkinClient   *http.Client
+	nativeCatalogMu sync.RWMutex
+	nativeCatalog   map[string]nativeCatalogEntry
+	nativeRefreshMu sync.Mutex
+	nativeAuthMu    sync.Mutex
 }
 
 // SetTagger wires the AI capability tagger.
@@ -265,6 +274,8 @@ func (s *Server) autostartState() bool {
 // New builds a server; Handler is immediately usable (for tests).
 func New(l *lane.Lane, st *store.Store) *Server {
 	s := &Server{Lane: l, Store: st, listen: net.Listen, probeTasks: newTaskRegistry()}
+	s.checkins = checkin.New(st.Home, s.checkinTargets, s.claimAccount)
+	s.checkinClient = lane.Client()
 	l.SetOpenCodePersist(s.persistOpenCode)
 	s.syncOpenCode()
 	// The lane reports every physical attempt here — including the failovers a

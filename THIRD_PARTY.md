@@ -6,7 +6,7 @@ Lamp Guide 是 zen-gate 的 Windows 桌面重构与扩展。本仓库保留上�
 | --- | --- | --- |
 | [LAGcomcom/zen-gate](https://github.com/LAGcomcom/zen-gate) | 网关基础、Agent 接入、渠道与路由等 | 根目录 [LICENSE](LICENSE)，保留 LAGcomcom 版权声明 |
 | [dsh-our-free-model](https://github.com/Ebony-Vinyl/dsh-our-free-model)（原 zouyuxuan122 项目） | 部分渠道协议及相关实现参考 | MIT，见 [独立声明](licenses/dsh-our-free-model.txt) |
-| [iJetLi/dsh-providers-hub](https://github.com/iJetLi/dsh-providers-hub) | 渠道账号、额度、目录与聚合实现参考 | MIT，见 [独立声明](licenses/dsh-providers-hub.txt) |
+| [iJetLi/dsh-providers-hub](https://github.com/iJetLi/dsh-providers-hub) | 渠道账号、额度、目录、每日领取与聚合实现参考；新增 AStudio / AutoClaw / MagiCrew 适配核对提交 `a5b3cd10dd` | MIT，见 [独立声明](licenses/dsh-providers-hub.txt) |
 | [Morpheus799/qodercn-gateway](https://github.com/Morpheus799/qodercn-gateway) | 内嵌 QoderCN 网关 | 见 [原组件完整 LICENSE](internal/zen/qoderhub/LICENSE) |
 | Go 标准库、go-webview2、go-winloader、go-qrcode、x/net、x/sys、yaml.v3 | 程序运行依赖 | 具体版本由 go.mod / go.sum 固定，许可证随构建生成 |
 | @resvg/resvg-js | 构建图标，非应用运行依赖 | packaging/package-lock.json 固定版本 |

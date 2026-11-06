@@ -260,36 +260,11 @@ func Start(ctx context.Context, opts Options) (*Core, error) {
 	ln.OnChange = syncEndpoints
 	gw.SetModelsSync(syncEndpoints)
 	ln.StartLoops(cctx, time.Duration(cfg.ProbeIntervalMinutes)*time.Minute)
-	// WorkBuddy 每日活跃：本地日历日一次，用免费模型发一条极小对话领取活跃
-	// 积分。启动 90s 后先查一次（覆盖"当天已登录"的场景），之后每小时补查；
-	// 已完成/未登录的检查是纯日期比较，重复触发没有成本。
-	go func() {
-		time.Sleep(90 * time.Second)
-		runWBActivity := func() {
-			ran, err := ln.WorkBuddyDailyActivity(cctx)
-			if !ran {
-				return
-			}
-			if err != nil {
-				logger.Infof("WorkBuddy 每日活跃未完成（下个小时重试）: %v", err)
-				return
-			}
-			logger.Infof("WorkBuddy 每日活跃已完成")
-		}
-		runWBActivity()
-		t := time.NewTicker(time.Hour)
-		defer t.Stop()
-		for {
-			select {
-			case <-cctx.Done():
-				return
-			case <-t.C:
-				runWBActivity()
-			}
-		}
-	}()
+	// Daily rewards use verified claim endpoints; background chat traffic is not
+	// evidence of a reward and must not be reported as a successful check-in.
 	gw.StartOpenRefLoop(cctx)
 	syncEndpoints()
+	gw.StartCheckins(cctx)
 
 	if err := gw.Start(); err != nil {
 		logger.Errorf("listen on port %d: %v", cfg.Port, err)

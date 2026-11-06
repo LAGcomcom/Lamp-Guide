@@ -137,6 +137,11 @@ func (s *Server) aggCatalogs() map[string][]aggregate.Model {
 			out[id] = append(out[id], aggregate.Model{ID: mid, Name: name, Pricing: p.ModelMeta[mid].Pricing, Rate: p.ModelMeta[mid].Pricing.Effective(now)})
 		}
 	}
+	for id, models := range s.nativeModels() {
+		for _, m := range models {
+			out[id] = append(out[id], aggregate.Model{ID: m.ID, Name: m.Name, Pricing: m.Pricing, Rate: m.Pricing.Effective(now)})
+		}
+	}
 	return out
 }
 

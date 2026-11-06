@@ -101,8 +101,8 @@ func TestPresetChannelsAreMerged(t *testing.T) {
 func TestEveryChannelRotates(t *testing.T) {
 	all := Channels()
 	// 30 家 = 已接线的三家（workbuddy / qoder / qodercn）+ 用户点名要加进来的 27 家。
-	if len(all) != 29 {
-		t.Fatalf("渠道表有 %d 家，期望 29 家（QoderCN 兼容别名不重复计数）", len(all))
+	if len(all) != 34 {
+		t.Fatalf("渠道表有 %d 家，期望 34 家（含新增五家，QoderCN 兼容别名不重复计数）", len(all))
 	}
 	wired := WiredIDs()
 	if len(wired) != len(all) {

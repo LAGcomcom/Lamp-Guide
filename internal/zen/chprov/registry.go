@@ -215,6 +215,11 @@ type Spec struct {
 // sidecar 是本项目既有能力），这里登记它们是为了**面板只有一张表**：渠道的额度
 // 来源与登录形态写在同一条记录里，不存在「加了一处、忘了另一处」的缝。
 var specs = []Spec{
+	newRewardSpec("astudio"),
+	newRewardSpec("autoclaw"),
+	newRewardSpec("autoclawintl"),
+	newRewardSpec("magicrew"),
+	newRewardSpec("magicrewintl"),
 	{
 		ID: "workbuddy", Tier: TierExpiry,
 		// ⚠️ **POST + body {}**，不是 GET：实测 GET 得 `404 page not found`
@@ -501,13 +506,13 @@ var specs = []Spec{
 			// 那条地址在浏览器里根本到不了授权端点。
 			AuthURL:      "https://auth.huaweicloud.com/authui/login",
 			AuthorizeURL: "https://auth.huaweicloud.com/authui/v1/oauth2/authorize",
-			StateURL:    "https://agentarts.cn-southwest-2.myhuaweicloud.com/v1/claw/auth/state",
-			CodeURL:     "https://agentarts.cn-southwest-2.myhuaweicloud.com/v1/claw/auth/code",
-			ExchangeURL: "https://sts.cn-north-4.myhuaweicloud.com/v1/oauth2/tokens",
-			RedirectURI: "https://agentarts.cn-southwest-2.myhuaweicloud.com/v1/claw/auth/callback",
-			ClientID:    "pdp5_for_agentarts",
-			Scope:       "openid",
-			Note:        "华为云 AgentArts：先在云端登记 state，浏览器里登录并同意后由云端收回 code，这里再换 STS 凭据。"},
+			StateURL:     "https://agentarts.cn-southwest-2.myhuaweicloud.com/v1/claw/auth/state",
+			CodeURL:      "https://agentarts.cn-southwest-2.myhuaweicloud.com/v1/claw/auth/code",
+			ExchangeURL:  "https://sts.cn-north-4.myhuaweicloud.com/v1/oauth2/tokens",
+			RedirectURI:  "https://agentarts.cn-southwest-2.myhuaweicloud.com/v1/claw/auth/callback",
+			ClientID:     "pdp5_for_agentarts",
+			Scope:        "openid",
+			Note:         "华为云 AgentArts：先在云端登记 state，浏览器里登录并同意后由云端收回 code，这里再换 STS 凭据。"},
 		ExtraKeys: []string{"access_key_id", "secret_access_key", "security_token"},
 		Note: "订阅的每个积分桶都带 expiresAt；领取是自动的，没有手动签到入口。" +
 			"⚠️ 读数必须与凭据绑定：凭据不在时报「未登录」，不用陈旧缓存充数。",
@@ -670,6 +675,10 @@ func buddyHeaders(domain, productCode, ua string) func(Account) map[string]strin
 // 读额度，拿整表去校验会把能用的凭据判成「不完整」。
 func QuotaExtraKeys(id string) []string {
 	switch id {
+	case "astudio":
+		return []string{"sso_session_id"}
+	case "magicrewintl":
+		return []string{"organization_code"}
 	case "codearts":
 		return []string{"access_key_id", "secret_access_key"}
 	case "loomy":

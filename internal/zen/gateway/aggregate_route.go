@@ -48,6 +48,9 @@ func (t aggTarget) servedID() string {
 	if t.provider != nil {
 		return t.provider.ID + "/" + t.model
 	}
+	if t.model != "" {
+		return t.channel + "/" + t.model
+	}
 	return t.laneModel
 }
 
@@ -145,6 +148,9 @@ func (s *Server) aggregateChainFrom(model string, cfg *store.Config, expiries ma
 // 里永远轮不到它们 —— 这正是本项目最在意的那种静默缺陷（面板有、链上永远没有、
 // 零报错）。判据只有一个来源：aggTargetOf 用它，面板也用它。
 func (s *Server) channelRoutable(id string) bool {
+	if s.nativeChannel(id) {
+		return len(s.nativeModels()[id]) > 0
+	}
 	if s.aggregateProvider(id) != nil {
 		return true
 	}
@@ -163,6 +169,14 @@ func (s *Server) channelRoutable(id string) bool {
 // aggTargetOf 把一条候选换成执行目标。
 func (s *Server) aggTargetOf(c aggregate.Candidate) (aggTarget, bool) {
 	if !s.channelRoutable(c.Channel) {
+		return aggTarget{}, false
+	}
+	if s.nativeChannel(c.Channel) {
+		for _, model := range s.nativeModels()[c.Channel] {
+			if model.ID == c.RealID {
+				return aggTarget{channel: c.Channel, realID: c.RealID, model: c.RealID}, true
+			}
+		}
 		return aggTarget{}, false
 	}
 	if p := s.aggregateProvider(c.Channel); p != nil {
@@ -231,7 +245,9 @@ func (s *Server) aggregateTurn(ctx context.Context, req lane.Request, chain []ag
 			outcome lane.Outcome
 			uerr    *lane.UpstreamError
 		)
-		if t.provider != nil {
+		if s.nativeChannel(t.channel) {
+			outcome, uerr = s.nativeTurn(ctx, req, t.channel, t.model, feed)
+		} else if t.provider != nil {
 			usage, finish, rerr := relay.Complete(ctx, relay.Turn{
 				Provider: t.provider, Model: t.model, Messages: req.Messages,
 				Tools: req.Tools, MaxTokens: req.MaxTokens, Agent: req.Agent,
