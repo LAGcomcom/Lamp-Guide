@@ -7,6 +7,7 @@
 <p align="center">zen-gate 的 Windows 桌面重构版本 · Go + Win32 + WebView2</p>
 <p align="center">
   <a href="https://github.com/LAGcomcom/Lamp-Guide/releases/latest">下载安装包</a> ·
+  <a href="https://github.com/LAGcomcom/Lamp-Guide-Android">安卓原生版</a> ·
   <a href="docs/MIGRATION.md">从 zen-gate 迁移</a> ·
   <a href="https://github.com/LAGcomcom/Lamp-Guide/issues">反馈问题</a> ·
   <a href="https://github.com/LAGcomcom/zen-gate">原版 zen-gate</a>
@@ -14,7 +15,7 @@
 
 Lamp Guide 基于 [zen-gate](https://github.com/LAGcomcom/zen-gate) 继续开发，将网关与桌面界面整合进一个进程。你可以在窗口里登录渠道、管理模型、配置代理、接入 Agent，并通过兼容 OpenAI / Anthropic 的本地入口调用模型。
 
-**项目关系：** zen-gate 保留原版源码与发布记录；Lamp Guide 在本仓库独立迭代。两者版本号分别计算，Lamp Guide `1.2.0` 是重构版版本号，不表示 zen-gate `1.10.0` 的降级。当前重构版提供 Windows 10 / 11 x64 安装包；其他平台请使用原仓库。
+**项目关系：** zen-gate 保留原版源码与发布记录；Lamp Guide 在本仓库独立迭代。两者版本号分别计算，Lamp Guide `1.2.0` 是重构版版本号，不表示 zen-gate `1.10.0` 的降级。当前重构版提供 Windows 10 / 11 x64 安装包；安卓原生客户端在独立仓库 [Lamp Guide Android](https://github.com/LAGcomcom/Lamp-Guide-Android) 维护与发布，其他平台请使用原仓库。
 
 ## 有什么变化
 
