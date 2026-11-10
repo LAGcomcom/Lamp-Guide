@@ -31,9 +31,11 @@ func newTestServer(t *testing.T, upstream *httptest.Server) *Server {
 	t.Helper()
 	old := lane.UpstreamBase
 	oldWB := lane.WorkBuddyBase
+	oldKilo := lane.KiloBase
 	lane.UpstreamBase = upstream.URL
 	lane.WorkBuddyBase = upstream.URL
-	t.Cleanup(func() { lane.UpstreamBase = old; lane.WorkBuddyBase = oldWB })
+	lane.KiloBase = upstream.URL
+	t.Cleanup(func() { lane.UpstreamBase = old; lane.WorkBuddyBase = oldWB; lane.KiloBase = oldKilo })
 	// Channel tests use dummy credentials; keep every quota request local too.
 	previousQuotaClient := chprov.Client
 	chprov.Client = &http.Client{Transport: reviewQuotaRT(func(r *http.Request) (*http.Response, error) {

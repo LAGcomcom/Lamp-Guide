@@ -96,7 +96,7 @@ func probeQoderCached(force bool) qoderStatus {
 // probeQoder observes the sidecar: running? token active? which models?
 func probeQoder() qoderStatus {
 	st := qoderStatus{}
-	code, body, err := qoderGet("/health")
+	code, _, err := qoderGet("/health")
 	if err != nil || code != 200 {
 		st.Detail = "qodercn-gateway 未运行（127.0.0.1:8095）"
 		return st
@@ -108,7 +108,7 @@ func probeQoder() qoderStatus {
 	// token that expires independently. Liveness is therefore judged by the
 	// thing that matters — can it still list and serve models — never by
 	// /quota, whose expiry is cosmetic.
-	code, body, err = qoderGet("/v1/models")
+	code, body, err := qoderGet("/v1/models")
 	if err != nil {
 		st.Detail = "网关在线但模型列表查询失败: " + err.Error()
 		return st

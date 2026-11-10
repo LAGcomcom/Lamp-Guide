@@ -172,9 +172,23 @@ func TestSettingsAllowLanRebinds(t *testing.T) {
 	if !s.Store.Config().AllowLan {
 		t.Fatalf("allowLan 未写入配置")
 	}
-	if _, err := getHealth(fmt.Sprintf("http://%s:%d/health", ip, port)); err != nil {
-		t.Fatalf("开关后未重新监听局域网: %v", err)
+	// The handler replies before Rebind() closes the listener serving this
+	// request (otherwise the response would be truncated), so the switch is
+	// still in flight when Post returns. Poll instead of racing it.
+	waitLANHealth(t, fmt.Sprintf("http://%s:%d/health", ip, port))
+}
+
+func waitLANHealth(t *testing.T, url string) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	var err error
+	for time.Now().Before(deadline) {
+		if _, err = getHealth(url); err == nil {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
+	t.Fatalf("开关后未重新监听局域网: %v", err)
 }
 
 func TestStateExposesLanEndpoint(t *testing.T) {

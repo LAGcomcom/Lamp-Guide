@@ -390,13 +390,15 @@ func (l *Lane) RefreshCatalog(ctx context.Context) {
 	prev := l.catalog
 	l.mu.Unlock()
 
-	var zen, kilo, wb []ModelInfo
+	var zen, kilo []ModelInfo
 	for _, m := range prev {
 		switch m.Channel {
 		case ChannelKilo:
 			kilo = append(kilo, m)
 		case ChannelWorkBuddy:
-			wb = append(wb, m)
+			// Rebuilt by fetchWorkBuddyCatalog below. Its own cache preserves
+			// rows across a partial/failed fetch, so keeping a copy here was
+			// collected and then unconditionally overwritten.
 		default:
 			zen = append(zen, m)
 		}
@@ -407,6 +409,7 @@ func (l *Lane) RefreshCatalog(ctx context.Context) {
 	if rows, err := fetchListingWithColdBootRetry(ctx, len(kilo), FetchCompleteKiloListing); err == nil && len(rows) > 0 {
 		kilo = buildKiloCatalog(rows, true)
 	}
+	var wb []ModelInfo
 	if acct, ok := l.workBuddyReady(); ok {
 		wb = l.fetchWorkBuddyCatalog(ctx)
 		if current, ready := l.workBuddyReady(); !ready || current.UID != acct.UID || current.Realm != acct.Realm {

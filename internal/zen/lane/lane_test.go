@@ -6,10 +6,37 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
 )
+
+// offlineTransport routes loopback traffic (httptest servers) normally and
+// refuses everything else. Background work such as ProbeRound's egress lookup
+// otherwise reaches ipinfo.io/ipify: on a machine without egress the dial sits
+// in the HTTP timeout and the package test hangs (shuffle surfaced this in
+// TestBackgroundTasksSkipPaidAndUnknownModels). Tests that need a specific
+// upstream still point UpstreamBase/KiloBase/WorkBuddyBase at an httptest server.
+type offlineTransport struct{ base http.RoundTripper }
+
+func (t offlineTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	switch strings.ToLower(req.URL.Hostname()) {
+	case "127.0.0.1", "::1", "localhost":
+		return t.base.RoundTrip(req)
+	}
+	return nil, fmt.Errorf("lane tests are offline: blocked %s", req.URL.Host)
+}
+
+func TestMain(m *testing.M) {
+	// Keep the test seam outside SetProxy's swaps: those replace the transport
+	// inside laneTransport, not the wrapper installed here.
+	oldTransport := laneHTTP.Transport
+	laneHTTP.Transport = offlineTransport{base: laneTransport}
+	code := m.Run()
+	laneHTTP.Transport = oldTransport
+	os.Exit(code)
+}
 
 // --- identity minting -------------------------------------------------------
 
